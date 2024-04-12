@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Home</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+   <style>
+        .navbar-nav .nav-link.active:link {
+            color: rgb(250, 250, 250) !important; /* This will change the text color */
+            text-decoration: none !important;
+            border-bottom: 3px solid rgb(246, 246, 247) !important; 
+            /* border-radius: ; */
+        }
+
+        .content{
+          margin:5% 15% 5% 15% ;
+
+
+
+}
+.navbar-nav .nav-link.active:hover {
+            border-bottom-color: rgb(196, 199, 196) !important; /* This will change the border color on hover */
+        }
+        .bottom-nav{
+            display: block;
+            width: 100%;
+            height: 2.0rem; 
+font-size:large;
+            overflow: hidden;
+            text-align: center;
+            color: white;
+            z-index: 5;
+            position: relative !important;
+            background-color: rgba(0, 90, 67, .9) !important;
+            }
+    </style>
+    <link rel="stylesheet" href="./css/style.css">
+    
+    
+</head>
+<body>
+    <!-- <h1>Welcome to the Home Page</h1>
+    <ul>
+        <li><a href="{{ url_for('formation_energy') }}">Vasp File Download</a></li>
+        <li><a href="{{ url_for('bandgap') }}">Bandgap</a></li>
+        <li><a href="{{ url_for('host_material') }}">Formation Energy</a></li>
+        <li><a href="{{ url_for('new_page') }}">New Page</a></li>
+    </ul> -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light" style="background-color:#004333 !important; padding:1.5rem 1rem">
+        <a class="navbar-brand" href="{{ url_for('home') }}" style="color:white;font-size:24px">Semiconductor Material Defect Database</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav" style="justify-content: end;">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link active" style="color:white" href="{{ url_for('home') }}">Home <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" style="color:white" href="{{ url_for('material_specific') }}">ABX<sub>3</sub>-DFT</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" style="color:white" href="{{ url_for('host_material') }}">ABX<sub>3</sub>-ML</a></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" style="color:white" href="{{ url_for('bandgap') }}">A<sub>2</sub>B<sub>1</sub>B<sub>2</sub>X<sub>6</sub></a>
+            </li>
+            
+            <li class="nav-item">
+              <a href="{{ url_for('dashboard') }}">Go to Dash App</a>
+            </li>
+          </ul>
+        </div>
+       </nav><div class="bottom-nav">
+        About
+    </div>
+</body>
+</html>
