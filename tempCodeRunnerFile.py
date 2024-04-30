@@ -294,10 +294,10 @@ for file in os.listdir(vasp_dir):
 
 # Define layout of the Dash app
 dash_app.layout = html.Div(children=[
-    html.H1(children='Hello Dash'),
-    html.Div(children='''
-        3D- Structure view 
-    '''),
+    # html.H1(children='Hello Dash'),
+    # html.Div(children='''
+    #     3D- Structure view 
+    # '''),
     html.Div([
         html.H1("Model Structure"),
         html.Label("Select Dopant:"),
