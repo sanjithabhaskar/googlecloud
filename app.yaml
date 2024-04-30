@@ -1,0 +1,313 @@
+imports:
+  - sqlite3
+  - flask: Flask, render_template, request, redirect, send_from_directory, url_for, jsonify, send_file
+  - dash: dash, Input, Output, PreventUpdate
+  - os
+  - pymatgen.io.vasp.outputs: Poscar
+  - crystal_toolkit.components as ctc
+  - dash: dcc, html
+
+app:
+  Flask: __name__
+
+server: app
+
+external_stylesheets:
+  - https://codepen.io/chriddyp/pen/bWLwgP.css
+
+dash_app:
+  Dash:
+    __name__: __name__
+    server: server
+    url_base_pathname: /dashboard/
+    external_stylesheets: external_stylesheets
+
+conn:
+  sqlite3.connect: perov21.db
+
+cur:
+  conn.cursor: 
+
+get_dopants:
+  function: |
+    conn = sqlite3.connect('perov21.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT Dopant FROM FormEnData")
+    dopants = cursor.fetchall()
+    conn.close()
+    return [dopant[0] for dopant in dopants]
+
+get_host_material:
+  function: |
+    conn = sqlite3.connect('perov21.db')
+    cursor = conn.cursor()
+    if material:
+        cursor.execute("SELECT DISTINCT hostmaterial FROM hostmaterial WHERE hostmaterial = ?", (material,))
+    else:
+        cursor.execute("SELECT DISTINCT hostmaterial FROM hostmaterial")
+    hostmaterials = cursor.fetchall()
+    conn.close()
+    return [hostmaterial[0] for hostmaterial in hostmaterials]
+
+get_specific_element:
+  function: |
+    conn = sqlite3.connect('perov21.db')
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT DISTINCT Element FROM {hostmaterial}")
+    specificelements = cursor.fetchall()
+    conn.close()
+    return [specificelement[0] for specificelement in specificelements]
+
+get_elements:
+  function: |
+    conn = sqlite3.connect('perov21.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT Element FROM bandgapfull")
+    elements = cursor.fetchall()
+    conn.close()
+    return [element[0] for element in elements]
+
+home:
+  route: /
+  function: render_template('home.html')
+
+vasp_download:
+  route: /vasp_download
+  methods: ['GET', 'POST']
+  function: |
+    dopants = get_vaspfile()
+
+    if request.method == 'POST':
+        file_name_selected = request.form.get('option')  
+        return render_template('formation_energy.html', dopants=dopants,
+                               option=file_name_selected)
+    return render_template('formation_energy.html', dopants=dopants)
+
+get_vaspfile:
+  function: |
+    conn = sqlite3.connect('perov21.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT Filename FROM Vasp_new")
+    vaspfiles = cursor.fetchall()
+    conn.close()
+    return [vaspfile[0] for vaspfile in vaspfiles]
+
+vasp:
+  route: /vasp
+  methods: ['GET']
+  function: |
+    dopants = get_vaspfile()
+    dopant = request.args.get('dopant')
+    print(dopant)
+    if dopant in dopants:
+        file_name = dopant + ".vasp"
+        directory = os.path.join(app.root_path, 'data/vasp_files')
+        try:
+            return send_from_directory(directory, file_name, as_attachment=True)
+        except FileNotFoundError:
+            return "File not found", 404
+    else:
+        return "Option not found"
+
+get_formation_energy:
+  function: |
+    conn = sqlite3.connect('perov21.db')
+    cursor = conn.cursor()
+    if model == 'GPR':
+        cursor.execute("SELECT `Formation Energy GPR` FROM FormEnData WHERE Dopant = ?", (dopant,))
+    elif model == 'RFR':
+        cursor.execute("SELECT `Formation Energy RFR` FROM FormEnData WHERE Dopant = ?", (dopant,))
+    elif model == 'NN':
+        cursor.execute("SELECT `Formation Energy NN` FROM FormEnData WHERE Dopant = ?", (dopant,))
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        return result[0]
+    else:
+        return "No data available for the selected dopant and model"
+
+dft_formation:
+  function: |
+    conn = sqlite3.connect('perov21.db')
+    cursor = conn.cursor()
+    query = f"SELECT `formation energy (eV)`, `charge transition (+/0) (eV)` FROM {host_material} WHERE Element = ?"
+    cursor.execute(query, (selected_element,))
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        formation_energy, charge_transition = result
+        return (formation_energy, charge_transition)
+    else:
+        return "No data available for the selected element"
+
+get_host_material_energy:
+  function: |
+    conn = sqlite3.connect('perov21.db')
+    cursor = conn.cursor()
+    if model == 'GPR':
+        cursor.execute("SELECT `GPR` FROM formationfull WHERE Dopant = ?", (dopant,))
+    elif model == 'RFR':
+        cursor.execute("SELECT `RFR` FROM formationfull WHERE Dopant = ?", (dopant,))
+    elif model == 'NN':
+        cursor.execute("SELECT `NN` FROM formationfull WHERE Dopant = ?", (dopant,))
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        return result[0]
+    else:
+        return "No data available for the selected dopant and model"
+
+bandgap:
+  route: /bandgap
+  methods: ['GET', 'POST']
+  function: |
+    elements = get_elements()
+    model_options = ['GPR', 'NN', 'RFR']
+    if request.method == 'POST':
+        selected_element = request.form['element']
+        selected_model = request.form['model']
+        bandgap_value = get_bandgap(selected_element, selected_model)
+        return render_template('bandgap.html', elements=elements, model_options=model_options,
+                               selected_element=selected_element, selected_model=selected_model,
+                               bandgap_value=bandgap_value)
+    return render_template('bandgap.html', elements=elements, model_options=model_options)
+
+get_bandgap:
+  function: |
+    conn = sqlite3.connect('perov21.db')
+    cursor = conn.cursor()
+    if model == 'GPR':
+        cursor.execute("SELECT `GPR` FROM bandgapfull WHERE Element = ?", (element,))
+    elif model == 'NN':
+        cursor.execute("SELECT `NN` FROM bandgapfull WHERE Element = ?", (element,))
+    elif model == 'RFR':
+        cursor.execute("SELECT `RFR` FROM bandgapfull WHERE Element = ?", (element,))
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        return result[0]
+    else:
+        return "No data available for the selected element and model"
+
+host_material:
+  route: /host_material
+  methods: ['GET', 'POST']
+  function: |
+    hostmaterials = get_host_material()
+    model_options = ['GPR', 'RFR']
+    selected_material= 'CsSnI3'
+    dopants = get_specific_element(selected_material)
+    if request.method == 'POST':
+        selected_dopant = request.form['dopant']
+        selected_model = request.form['model']
+        formation_energy_value = get_host_material_energy(selected_dopant, selected_model)  
+        return render_template('host_material.html',  dopants=dopants,
+                               model_options=model_options,
+                               hostmaterial=selected_material,
+                               selected_dopant=selected_dopant,
+                               hostmaterials=hostmaterials,
+                               formation_energy_value=formation_energy_value)
+    return render_template('host_material.html', hostmaterial=selected_material,model_options=model_options,dopants=dopants,hostmaterials=hostmaterials)
+
+material_specific:
+  route: /material_specific
+  methods: ['GET', 'POST']
+  function: |
+    hostmaterials = get_host_material()
+    selected_material = 'CsSnI3'
+    dopants = get_specific_element(selected_material)
+    model_options = ['GPR', 'NN', 'RFR']
+    if request.method == 'POST':
+        selected_material = request.form['hostmaterial']
+        selected_dopant = request.form['dopant']
+        result = dft_formation(selected_dopant, selected_material)
+        formation_energy_value = result[0]
+        charge_transition = result[1]
+        return render_template('material_specific.html', dopants=dopants,
+                               model_options=model_options,
+                               selected_dopant=selected_dopant,
+                               selected_material=selected_material,
+                               formation_energy_value=formation_energy_value,
+                               charge_transition=charge_transition,
+                               hostmaterials=hostmaterials)
+    dash_content = dash_app.index()
+    return render_template('material_specific.html', dopants=dopants,
+                           model_options=model_options,
+                           selected_material=selected_material,
+                           hostmaterials=hostmaterials,
+                           dash_content=dash_content)
+
+new_page:
+  route: /new_page
+  methods: ['GET', 'POST']
+  function: |
+    hostmaterials = get_host_material()
+    if request.method == 'POST':
+        selected_material = request.form['hostmaterial']
+        return redirect(url_for('material_specific', materialselect=selected_material))
+    return render_template('new_page.html', hostmaterials=hostmaterials)
+
+new_page_con:
+  route: /new_page_con/<materialselect>
+  methods: ['GET', 'POST']
+  function: |
+    if request.method == 'POST':
+        selected_material = request.form['hostmaterial']
+        return redirect(url_for('material_specific', materialselect=selected_material))
+    else:
+        specificelements = get_specific_element(materialselect)
+        formation_energy_value = dft_formation(specificelements[0], materialselect)
+        return render_template('new_page_con.html', specificelements=specificelements,
+                               selected_material=materialselect,
+                               formation_energy_value=formation_energy_value)
+
+get_element_options:
+  function: |
+    cur.execute("SELECT DISTINCT filename FROM Vasp_new")
+    options = cur.fetchall()
+    return [{'label': filename[0], 'value': filename[0]} for filename in options]
+
+vasp_dir: data/vasp_files
+
+file_paths: {}
+
+dash_app_layout:
+  children:
+    - html.Div:
+        children:
+          - html.H1: "Model Structure"
+          - html.Label: "Select Dopant:"
+          - dcc.Dropdown:
+              id: "structure-dropdown"
+              options: get_element_options()
+              value: list(file_paths.keys())[0] if file_paths else None
+          - html.Div:
+              id: "structure-layout"
+          - dcc.Interval:
+              id: "interval-component"
+              interval: 5000
+              n_intervals: 0
+
+dash_app_callback:
+  function: |
+    Output("structure-layout", "children"),
+    [Input("structure-dropdown", "value"),
+     Input("interval-component", "n_intervals")],
+    function: |
+        if selected_option in file_paths:
+            structure = Poscar.from_file(file_paths[selected_option]).structure
+            structure_component = ctc.StructureMoleculeComponent(structure, id="my_structure")
+            return structure_component.layout()
+        else:
+            return html.Div("Error: Selected option not found in file paths")
+
+dashboard_route:
+  route: /dashboard/
+  function: |
+    return dash_app.index()
+
+run:
+  if: __name__ == '__main__'
+  function: |
+    app.run(debug=True)
+
